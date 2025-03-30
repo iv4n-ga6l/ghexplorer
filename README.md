@@ -1,7 +1,5 @@
 # ghexplorer
 
-![Demo](https://github.com/user-attachments/assets/2d156f0a-146a-459b-aa53-4dcff398394e)
-
 ghexplorer is a terminal-based application written in Go that allows users to interactively explore GitHub profiles, repositories, and file contents. This tool provides a user-friendly interface to navigate through GitHub Profile without leaving your terminal.
 
 https://github.com/user-attachments/assets/aa417c9e-3b3d-4ad1-a3e8-ca4991580a25
