@@ -6,6 +6,8 @@ ghexplorer is a terminal-based application written in Go that allows users to in
 
 https://github.com/user-attachments/assets/aa417c9e-3b3d-4ad1-a3e8-ca4991580a25
 
+![Diagram](diagram.png)
+
 ## Features
 
 - **Profile Viewing**: Enter a GitHub username to view basic profile information.
