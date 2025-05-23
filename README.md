@@ -63,7 +63,7 @@ go install
 
 ### Download Binary
 
-Download the latest binary from the [Releases](https://github.com/yourusername/ghexplorer/releases) page.
+Download the latest binary from the [Releases](https://github.com/iv4n-ga6l/ghexplorer/releases) page.
 
 ## 🚀 Quick Start
 
