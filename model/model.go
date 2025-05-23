@@ -162,13 +162,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.selectMode {
 					switch msg.String() {
 					case "up":
-						m.selectEnd = max(0, m.selectEnd-m.viewport.Width)
+						m.selectEnd = helper.Max(0, m.selectEnd-m.viewport.Width)
 					case "down":
-						m.selectEnd = min(len(m.fileContent), m.selectEnd+m.viewport.Width)
+						m.selectEnd = helper.Min(len(m.fileContent), m.selectEnd+m.viewport.Width)
 					case "left":
-						m.selectEnd = max(0, m.selectEnd-1)
+						m.selectEnd = helper.Max(0, m.selectEnd-1)
 					case "right":
-						m.selectEnd = min(len(m.fileContent), m.selectEnd+1)
+						m.selectEnd = helper.Min(len(m.fileContent), m.selectEnd+1)
 					}
 				}
 				m.viewport, cmd = m.viewport.Update(msg)
@@ -368,7 +368,7 @@ func (m Model) getPaginationInfo() (currentPage, totalPages, startIdx, endIdx in
 	totalPages = (totalItems + config.ItemsPerPage - 1) / config.ItemsPerPage
 
 	startIdx = (currentPage - 1) * config.ItemsPerPage
-	endIdx = min(startIdx+config.ItemsPerPage, totalItems)
+	endIdx = helper.Min(startIdx+config.ItemsPerPage, totalItems)
 
 	return currentPage, totalPages, startIdx, endIdx
 }
