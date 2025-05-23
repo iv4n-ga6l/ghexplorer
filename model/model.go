@@ -2,6 +2,9 @@ package model
 
 import (
 	"fmt"
+	"ghexplorer/config"
+	"ghexplorer/github_api"
+	"ghexplorer/helper"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -10,10 +13,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-
-	"ghexplorer/config"
-	"ghexplorer/github_api"
-	"ghexplorer/helper"
 )
 
 // Model is the base model
@@ -37,9 +36,6 @@ type Model struct {
 	spinner      spinner.Model
 	tabs         []string
 	activeTab    int
-	loading      bool
-	loadingMsg   string
-	statusMsg    string
 }
 
 // InitialModel initialModel initialize the model
@@ -65,9 +61,6 @@ func InitialModel(initialGithubID string) Model {
 		tabs:        []string{"Overview", "Repositories"},
 		activeTab:   0,
 		viewport:    vp,
-		loading:     false,
-		loadingMsg:  "",
-		statusMsg:   "",
 	}
 
 	// If initial GitHub ID is provided, set it in the text input
@@ -102,66 +95,34 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.currentView = "repositories"
 				}
 			}
-		case "r":
-			if m.currentView == "repositories" || m.currentView == "profile" {
-				m.loading = true
-				m.loadingMsg = "Refreshing repositories..."
-				m.currentView = "loading"
-				return m, tea.Batch(m.spinner.Tick, m.fetchRepositories)
-			}
-		case "h":
-			// Show help
-			if m.currentView != "input" && m.currentView != "loading" {
-				m.statusMsg = "Help: ↑/↓ navigate, Enter select, Tab switch, / search, r refresh, q quit"
-			}
-		case "ctrl+r":
-			// Force refresh profile
-			if m.githubID != "" && m.currentView != "input" && m.currentView != "loading" {
-				m.loading = true
-				m.loadingMsg = "Refreshing profile..."
-				m.currentView = "loading"
-				return m, tea.Batch(m.spinner.Tick, m.fetchProfile)
-			}
 		case "enter":
 			switch m.currentView {
 			case "input":
-				m.githubID = m.textInput.Value()
 				m.inputting = false
-				m.currentView = "loading"
-				m.loading = true
-				m.loadingMsg = "Fetching profile..."
-				return m, tea.Batch(m.spinner.Tick, m.fetchProfile)
+				m.currentView = "profile"
+				return m, m.fetchProfile
 			case "repositories":
 				if m.cursor < len(m.repositories) {
 					m.selected["repository"] = m.repositories[m.cursor].Name
-					m.currentView = "loading"
+					m.currentView = "files"
 					m.cursor = 0
 					m.selected["path"] = ""
-					m.loading = true
-					m.loadingMsg = "Loading repository contents..."
-					return m, tea.Batch(m.spinner.Tick, m.fetchRepositoryContents)
+					return m, m.fetchRepositoryContents
 				}
 			case "files":
 				if m.cursor < len(m.fileContents) {
 					if m.fileContents[m.cursor].Type == "file" {
 						m.selected["file"] = m.fileContents[m.cursor].Name
-						m.currentView = "loading"
-						m.loading = true
-						m.loadingMsg = "Loading file content..."
-						return m, tea.Batch(m.spinner.Tick, m.fetchFileContent)
+						m.currentView = "fileContent"
+						return m, m.fetchFileContent
 					} else {
 						m.selected["path"] += "/" + m.fileContents[m.cursor].Name
-						m.currentView = "loading"
-						m.loading = true
-						m.loadingMsg = "Loading directory..."
-						return m, tea.Batch(m.spinner.Tick, m.fetchRepositoryContents)
+						return m, m.fetchRepositoryContents
 					}
 				}
 			case "search":
-				m.currentView = "loading"
-				m.loading = true
-				m.loadingMsg = "Searching repositories..."
-				return m, tea.Batch(m.spinner.Tick, m.searchRepositories)
+				m.currentView = "repositories"
+				return m, m.searchRepositories
 			}
 		case "backspace":
 			if m.inputting && len(m.githubID) > 0 {
@@ -273,40 +234,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.currentView == "fileContent" {
 			m.viewport.SetContent(m.fileContent)
 		}
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
 	case github_api.GitHubProfile:
 		m.profile = &msg
-		m.loading = true
-		m.loadingMsg = "Loading repositories..."
-		return m, tea.Batch(m.spinner.Tick, m.fetchRepositories)
+		return m, m.fetchRepositories
 	case []*github_api.Repository:
 		m.repositories = msg
 		m.currentView = "repositories"
 		m.cursor = 0
-		m.loading = false
-		m.statusMsg = fmt.Sprintf("Loaded %d repositories", len(msg))
 	case []*github_api.FileInfo:
 		m.fileContents = msg
-		m.currentView = "files"
 		m.cursor = 0
-		m.loading = false
-		m.statusMsg = fmt.Sprintf("Loaded %d items", len(msg))
 	case string:
 		m.fileContent = msg
-		m.currentView = "fileContent"
-		m.loading = false
-		m.statusMsg = "File loaded successfully"
-		if m.viewport.Height > 0 {
+		if m.currentView == "fileContent" {
 			m.viewport.SetContent(m.fileContent)
 			m.viewport.GotoTop()
 		}
 	case error:
 		m.currentView = "error"
 		m.errorMessage = msg.Error()
-		m.loading = false
 		return m, nil
 	}
 	m.textInput, cmd = m.textInput.Update(msg)
@@ -363,9 +309,14 @@ func (m Model) searchRepositories() tea.Msg {
 func (m Model) View() string {
 	switch m.currentView {
 	case "input":
-		return m.inputView()
-	case "loading":
-		return m.loadingView()
+		return config.DocStyle.Render(
+			lipgloss.JoinVertical(
+				lipgloss.Center,
+				config.HeaderStyle.Render("Git CLI Explorer"),
+				"\n",
+				config.CardStyle.Render(m.textInput.View()),
+			),
+		)
 	case "profile", "repositories":
 		return m.tabView()
 	case "files":
@@ -650,43 +601,6 @@ func (m Model) searchView() string {
 	)
 }
 
-// inputView handles the CLI input view
-func (m Model) inputView() string {
-	return config.DocStyle.Render(
-		config.CardStyle.Render(
-			lipgloss.JoinVertical(
-				lipgloss.Center,
-				config.HeaderStyle.Render("GitHub Profile Explorer"),
-				"",
-				"Enter GitHub username:",
-				m.textInput.View(),
-				"",
-				config.FooterStyle.Render("Press Enter to continue • q to quit"),
-			),
-		),
-	)
-}
-
-// loadingView handles the CLI loading view
-func (m Model) loadingView() string {
-	return config.DocStyle.Render(
-		config.CardStyle.Render(
-			lipgloss.JoinVertical(
-				lipgloss.Center,
-				config.HeaderStyle.Render("GitHub Profile Explorer"),
-				"",
-				lipgloss.JoinHorizontal(
-					lipgloss.Center,
-					m.spinner.View(),
-					" "+m.loadingMsg,
-				),
-				"",
-				config.FooterStyle.Render("Please wait... • q to quit"),
-			),
-		),
-	)
-}
-
 // errorView handles the CLI error view
 func (m Model) errorView() string {
 	return config.DocStyle.Render(
@@ -701,27 +615,4 @@ func (m Model) errorView() string {
 			),
 		),
 	)
-}
-
-func (m Model) renderFooter() string {
-	var footerText string
-	switch m.currentView {
-	case "repositories":
-		footerText = "↑/↓: navigate • Enter: open repo • Tab: switch tabs • /: search • q: quit"
-	case "files":
-		footerText = "↑/↓: navigate • Enter: open • Backspace: back • q: quit"
-	case "fileContent":
-		footerText = "↑/↓/PgUp/PgDn: scroll • Ctrl+A: select all • Ctrl+C: copy • Ctrl+D: copy selection • Backspace: back • q: quit"
-	case "search":
-		footerText = "Type to search • Enter: search • Esc: back • q: quit"
-	default:
-		footerText = "q: quit"
-	}
-
-	// Add status message if available
-	if m.statusMsg != "" {
-		footerText = m.statusMsg + " • " + footerText
-	}
-
-	return config.FooterStyle.Render(footerText)
 }
