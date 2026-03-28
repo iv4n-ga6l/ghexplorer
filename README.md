@@ -1,6 +1,6 @@
 <p align="center">
 	<a href="https://github.com/IvanGael/ghexplorer" rel="noopener">
-		<img width="220" src="diagram.png" alt="ghexplorer diagram">
+		<img src="diagram.png" alt="ghexplorer diagram">
 	</a>
 </p>
 
